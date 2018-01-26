@@ -1,0 +1,49 @@
+
+vi ~/.bashrc   修改.bashrc
+
+我们敲的所有命令都是一个程序，系统在哪找这些程序呢？
+有一个环境变量
+   echo $PATH   通过这个可以查看查找路径, 
+
+ 		即如果我们写一个程序放到这些路径中的一个路径中,
+    敲这个程序的名字就可运行这个程序
+
+脚本：   由命令组成的文件，这些命令都是可执行程序的名字，
+     脚本不用编译即可运行，通过解释器解释执行，所以速度比较慢
+
+Linux中不以后缀名判断文件类型，它是给人看的。
+    .sh   : shell脚本文件
+
+dash 和 bash都是脚本解释器（dash功能没有bash全面, 一般使用bash）
+
+sudo dpkg-reconfigure dash  修改默认脚本解释器,即改变sh(通过sh可以执行shell脚本文件)的指向bash，默认指向dash。
+
+可以通过命令查看sh指向的shell解释器:  ls -l /bin/*sh
+
+
+
+第一句开始的#后面的不是注释，通过它来指定谁来解释执行该脚本文件，例如: #!/bin/dash   指定dash来执行
+后面的#开头到本行结束是注释
+
+例：一个脚本文件 script.sh:
+#!/bin/sh
+echo "this is my first shell script"
+
+执行 :  sh script.sh  回车 
+        sudo ./script.sh  回车 //为什么要用root权限呢？因为没有可执行权限，可通过chmod 来增加可执行权限
+
+        这两种方式有什么区别呢？
+        sh ：使用/bin/sh所指向的shell解释器来执行脚本文件 
+        ./script.sh : 它默认使用sh方式，但如果脚本文件指定了解释器，则使用该解释器执行脚本，不管sh指向的是哪个Shell解释器
+
+        也有第三种执行方式：指定脚本文件的绝对路径，也可执行。
+        例: /home/litao/LinuxStudyAgain/03shell/script.sh
+
+输出 :  this is my first shell script
+
+
+修改系统分辨率
+     xrandr  查看支持的所有分辨率
+     xrandr -s + 分辨率  修改
+
+

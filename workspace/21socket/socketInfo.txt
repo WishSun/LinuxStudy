@@ -1,0 +1,438 @@
+
+套接字结构:
+
+    //既可以存放IPv4也可以存放IPv6地址
+    struct sockaddr
+    {
+        unsigned short sa_family;     //地址类型
+        char           sa_data[14];   //14字节的协议地址
+    }
+
+(1) 成员sa_family表示套接字的协议族类型
+    AF_INET: TCP/IP协议
+
+    
+    每种协议族都有自己的协议地址格式，TCP/IP协议的地址格式为:
+         struct sockaddr_in
+         {
+            unsigned short      sin_family;  //地址类型
+            unsigned short int  sin_port;    //端口号
+            unsigned in_addr    sin_addr;    //IP地址
+            unsigned char       sin_zero[8]; //填充字节，一般为0
+         }
+
+        <1>其中sin_family表示地址类型，对于使用TCP/IP协议进行的网络编程，该值只能是AF_INET。
+        <2>sin_port是端口号
+        <3>sin_addr用来存储32位的IP地址
+           struct in_addr
+           {
+                uint32_t   s_addr;
+           }
+        <4>sin_zero为填充字段，一般赋值为0 
+(2) 结构体sockaddr的长度为16字节，结构体sockaddr_in的长度也是16字节。通常在编写基于TCP/IP协议的网络程序时，使用结构体sockaddr_in来设置地址，然后通过强制类型转换成sockaddr类型。
+
+    举个栗子:
+    struct sockaddr_in  sock;
+    sock.sin_family = AF_INET;
+    sock.sin_port = htons(80);    //设置端口号为80
+    inet_aton("172.17.242.131", &sock.sin_addr);  //设置IP地址
+    memset(sock.sin_zero, 0, sizeof(sock.sin_zero));  //将数组sin_zero清0
+
+
+
+<sys/types.h>
+<sys/socket.h>
+创建套接字--------------------------
+int socket(int domain, int type, int protocol);
+    参数说明:
+    domain : 用于指定创建套接字所使用的协议族
+             AF_UNIX : 创建只在本机内进行通信的套接字
+             AF_INET : 使用IPv4 TCP/IP协议
+             AF_INET6: 使用IPv6 TCP/IP协议
+    type   : 指定套接字的类型
+             SOCK_STREAM : 创建TCP流式套接字
+             SOCK_DGRAM  : 创建UDP数据报套接字
+             SOCK_RAW    : 创建原始套接字
+    protocol: 通常设置为0，表示通过参数domain指定的协议族和参数type指定
+              的套接字类型来确定使用的协议。当创建原始套接字时，系统无法
+              唯一地确定协议，此时就需要使用该参数指定所使用的协议。
+
+    返回值:
+    执行成功返回一个新创建的套接字；如有错误发生则返回-1
+
+    举个栗子:
+        创建一个TCP套接字:
+        int sock_fd;
+        sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+        if (sock_fd < 0)
+        {
+            perror("socket");
+            exit(1);
+        }
+
+        创建一个UDP套接字:
+        sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+
+
+建立连接-------------------------
+int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen);
+    参数说明:
+    sockfd : 是一个由函数socket创建的套接字
+
+             <1> 如果该套接字的类型时SOCK_STREAM，即TCP套接字，则connect函数用于向
+             服务器发出连接请求，服务器的IP地址和端口号由serv_addr指定。
+
+             <2> 如果该套接字的类型是SOCK_DGRAM,即UDP套接字，则connect函数并不建立
+             真正的连接，它只是告诉内核与该套接字进行通信的目的地址(由第二个参数指
+             定),只有该目的地址发来的数据才会被该socket接收。对于SOCK_DGRAM类型的
+             套接字，调用connect函数的好处是不必在每次发送和接收数据时都指定目的地址。
+
+    serv_addr: 是一个地址结构
+    addrlen : 为参数serv_addr的长度
+
+
+    返回值 :
+    执行成功返回0 ，失败返回-1
+    
+
+    函数说明: 
+
+        通常一个面向连接的套接字(如TCP套接字)只能调用一次connect函数。
+
+        而对于无连接的套接字(如UDP套接字)则可以多次调用connect函数以改变与目的地址的
+    绑定，将参数serv_addr中的sa_family设置为AF_UNSPEC可以取消绑定。
+
+
+    举个栗子:
+
+    struct sockaddr_in      serv_addr;
+    memset(&serv_addr, 0, sizeof(struct sockaddr_in));   //将整个serv_addr清0
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = hton(80);   //端口为80
+
+    //将一个字符串转化为一个网络地址，并把该网络地址赋给第二个参数
+    if(inet_aton("172.17.242.131", &serv_addr.sin_addr) < 0)  
+    {
+        perror("inet_aton");
+        exit(1);
+    }
+
+    //使用sock_fd套接字连接到由serv_addr指定的目的地址上
+    if(connect(sock_fd, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr_in)) < 0)
+    {
+        perror("connect");
+        exit(1);
+    }
+
+
+
+绑定套接字-----------------------------
+int bind(int sockfd, struct sockaddr *my_addr, socklen_t addrlen);
+
+     函数说明:
+
+         socket函数只是创建了一个套接字，这个套接字将工作在哪个端口上，程序并没有指定。
+     在客户/服务器模型中，服务器端的IP地址和端口号一般是固定的，因此在服务器端的程序中，
+     使用bind函数将一个套接字和某个端口绑定在一起。该函数一般只有服务器端的程序调用。
+
+     参数说明:
+      
+     sockfd : 服务器端创建的套接字
+
+     my_addr: 指定了sockfd将绑定到的本地地址，可以将参数my_addr的sin_addr设置为INADDR_ANY,
+              而不是某个确定的IP地址就可以绑定到任何网络接口。对于只有一个IP地址的计算机，
+              INADDR_ANY对应的就是它的IP地址；对于多宿主主机(拥有多块网卡),INADDR_ANY表示
+              本服务器程序将处理来自所有网络接口上相应端口上的连接请求。
+
+     addrlen: 第二个参数的长度
+ 
+     返回值:
+     执行成功返回0，失败返回-1
+
+     举个栗子:
+
+     struct sockaddr_in     serv_addr;
+     memset(&serv_addr, 0, sizeof(struct sockaddr_in));
+     serv_addr.sin_family = AF_INET;
+     serv_addr.sin_port = htons(80);
+     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+     if(bind(sock_fd, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr_in)) < 0)
+     {
+        perror("bind");
+        exit(1);
+     }
+    
+
+在套接字上监听---------------------------
+int listen(int sockfd, int backlog);
+
+    函数说明:
+        由函数socket创建的套接字是主动套接字，这种套接字可以用来主动请求连接到某个服务器
+        (通过函数connect)。但是作为服务器端的程序，通常在某个端口上监听等待来自客户端的
+        连接请求。在服务器端，一般是先调用函数socket创建一个主动套接字，然后调用函数bind
+        将该套接字绑定到某个端口上，接着调用函数listen将该套接字转化为监听套接字，等待来自
+        客户端的连接请求。
+
+    参数说明:
+    sockfd :  服务器端的套接字
+    backlog : 一般多个客户端连接到一个服务器，服务器向这些客户端提供某种服务。服务端设置一个
+              连接队列，记录已经建立的连接，参数backlog指定了该连接队列的最大长度。如果连接队列
+              已经达到最大，之后的连接请求将被服务器拒绝。
+
+    返回值:
+    执行成功返回0， 失败返回-1
+
+    注意:  函数listen只是将套接字设置为监听模式以等待连接请求，它并不能接收连接请求，真正接收
+           客户端连接请求的是后面的函数accept。
+
+    举个栗子:
+
+    #define  LISTEN_NUM  12
+    ...
+    if (listen(sock_fd, LISTEN_NUM) < 0)
+    {
+        perror("listen");
+        exit(1);
+    }
+
+接受连接---------------------------------
+int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+
+    参数说明:
+    sockfd : 由函数socket创建，经函数bind绑定到本地某一端口上，然后通过函数listen转化而来的
+             监听套接字。
+    addr   : 用来保存发起连接请求的主机的地址和端口
+    addrlen: 是addr所指向的结构体的大小
+
+
+    返回值:
+    执行成功返回一个新的代表客户端的套接字，出错返回-1
+
+
+    函数说明:
+        只能对面向连接的套接字使用accept函数。accept执行成功时，将创建一个新的套接字，并且为这个
+    新的套接字分配一个套接字描述符，并返回这个新的套接字描述符。这个新的套接字描述符与打开文件
+    时返回的文件描述符类似，进程可以利用这个新的套接字描述符与客户端交换数据，参数sockfd所指定
+    的套接字继续等待客户端的连接请求。
+
+    举个栗子:
+    int     client_fd;      //存储与请求连接的客户端的通信的套接字描述符
+    int     client_len;    
+    struct sockaddr_in      client_addr;  //存储请求连接的客户端的IP地址和端口
+    ...
+    client_len = sizeof(struct sockaddr_in);
+    client_fd = accept(sock_fd, (struct sockaddr *)&client_addr, &client_len);
+    if(conn_fd < 0)
+    {
+        perror("accept");
+        exit(1);
+    }
+
+
+TCP套接字的数据传输-----------------------------------
+
+发送数据-----------------------------
+ssize_t  send(int sockfd, const void *msg, size_t len, int flags);
+
+    函数说明:
+        函数send只能对处于连接状态的套接字使用。
+
+    参数说明:
+    sockfd : 已经建立好连接的套接字描述符，即服务器端accept函数的返回值,
+             客户端调用connect函数之后的套接字描述符
+    msg    : 指向存放待发送数据的缓冲区
+    len    : 待发送数据的长度
+    flags  : 控制选项，一般设置为0
+
+    返回值:  执行成功返回实际发送的字节数，出错返回-1
+
+    注意 : 执行成功只是说明数据写入套接字的缓冲区中，并不表示已经成功地
+           通过网络发送到目的地
+
+    举个栗子:
+
+    #define  BUFFERSIZE   1500
+    char    send_buf[BUFFERSIZE];
+    ...
+    if (send(conn_fd, send_buf, len, 0) < 0)  //len为待发送数据的长度
+    {
+        perror("send");
+        exit(1);
+    }
+
+
+接收数据-----------------------------
+ssize_t recv(int sockfd, void *buf, size_t len, int flags);
+
+    参数说明:
+    sockfd : 函数recv从sockfd指定的套接字描述符(必须是面向连接的套接字)
+             上接收数据并保存到参数buf所指定的缓冲区，参数len则为缓冲区长度
+    buf  : 缓冲区指针
+    len  : 缓冲区大小
+    flags : 控制选项，一般设置为0
+
+    返回值:
+    执行成功返回接收到的数据字节数,出错返回-1
+
+    举个栗子:
+
+    char  recv_buf[BUFFERSIZE];
+    ...
+    if( recv(conn_fd, recv_buf, sizeof(recv_buf), 0) < 0)
+    {
+        perror("recv");
+        exit(1);
+    }
+
+
+UDP套接字的数据传输-----------------------------------------------
+
+发送数据----------------------------
+ssize_t  sendto(int sockfd, const void *msg, size_t len, int flags, const struct sockaddr *to, socklen_t tolen);
+
+    函数说明:
+        函数sendto的功能与函数send类似，但函数sendto不需要套接字处于连接状态，所
+    以该函数通常用来发送UDP数据。同时因为是无连接的套接字，在使用sendto时需要指定
+    数据的目的地址。
+
+    参数说明:
+    sockfd : 客户端/服务器套接字描述符
+    msg    : 指向待发送数据的缓冲区
+    len    : 指定了待发送数据的长度
+    flags  : 是控制选项，一般为0
+    to     : 用于指定目的地址
+    tolen  : 目的地址的长度
+
+    返回值:
+    执行成功返回实际发送数据的字节数，出错返回-1
+
+    举个栗子:
+
+    char    send_buf[BUFFERSIZE];
+    struct sockaddr_in  dest_addr;
+
+    //设置目的地址
+    memset(&dest_addr, 0, sizeof(struct sockaddr_in));
+    dest_addr.sin_family = AF_INET;
+    dest_addr.sin_port = htons(DEST_PORT);   //DEST_PORT是目的端口
+    if(inet_aton("172.17.242.131", &dest_addr.sin_addr) < 0)
+    {
+        perror("inet_aton");
+        exit(1);
+    }
+
+    if(sendto(sock_fd, send_buf, len, 0, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in)) < 0)
+    {
+        perror("sendto");
+        exit(1);
+    }
+
+
+接收数据-----------------------------
+ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *from, socklen_t *fromlen);
+
+    函数说明:
+    函数recvfrom与函数recv功能类似，只是函数recv只能用于面向连接的套接字，
+    而recvfrom没有此限制，可以用于从无连接的套接字(如UDP套接字)上接收数据。
+
+    参数说明:
+    sockfd : 接受方的套接字描述符
+    buf    : 指向接收缓冲区
+    len    : 指定了缓冲区的大小
+    flags  : 是控制选项，一般为0
+    from   : 如果from非空，且该套接字不是面向连接的，则函数recvfrom返回时,
+             参数from中将保存数据的源地址
+    fromlen: 在调用recvfrom前为参数from的长度，调用recvfrom后将保存from的实际大小
+
+    返回值:
+    执行成功返回实际接收到的数据的字节数，出错返回-1
+
+
+    举个栗子:
+    char    recv_buf[BUFFERSIZE];
+    struct  sockaddr_in src_addr;
+    int     src_len;
+
+    src_len = sizeof(struct sockaddr_in);
+    if(recvfrom(sock_fd, recv_buf, sizeof(recv_buf), 0, (struct sockaddr *)&src_addr, &src_len) < 0)
+    {
+        perror("again_recvfrom");
+        exit(1);
+    }
+
+
+关闭套接字---------------------------------------------
+<unistd.h>
+int close(int fd);
+参数fd为一个套接字描述符，该函数关闭一个套接字。
+执行成功返回0，出错返回-1
+
+
+inet系列函数------------------------------------------
+<netinet/in.h>
+<arpa/inet.h>
+
+inet_aton函数-----------------------------------------
+int inet_aton(const char *cp, struct in_addr *inp);
+    函数说明: 将参数cp所指向的字符串形式的IP地址转换为二进制的网络字节顺序的IP地址，
+              转换后的结果存于参数inp所指向的空间中
+    返回值:
+    执行成功返回非0值，参数无效则返回0
+
+    用途: 将IP地址字符串转换未网络字节顺序赋值给addr.sin_addr
+
+
+//htons函数-------------------------------
+uint16_t htons(uint16_t hostshort);
+uint16_t htons(uint16_t netshort);
+    函数说明: htons表示host to network short，用于将主机unsigned short 型数据转换成
+              网络字节顺序
+    用途: 将端口号数值转换为网络字节顺序 
+          例:struct sockaddr_in addr; 
+             addr.sin_port = htons(5000);
+
+
+
+//多路复用select技术-------------------------
+<sys/select.h>
+<sys/time.h>
+<sys/types.h>
+
+int select(int n, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+
+    参数说明:
+    n : 需要监视的文件描述符数，要监视的文件描述符值为0~n-1。
+    readfds : 指定需要监视的可读文件描述符集合，当这个集合中的一个描述符上有数据到达时，
+              系统将通知调用select函数的程序。
+    writefds: 指定需要监视的可写文件描述符集合，当这个集合中的某个描述符可以发送数据时，
+              程序将收到通知
+    exceptfds:指定需要监视的异常文件描述符集合，当该集合中的一个描述符发生异常时，程序
+              将收到通知
+    timeout : 指定了阻塞时间，如果这段时间内监视的文件描述符上都没有事件发生，则函数select()将返回0
+              如果timeout设为NULL，则select()将一直阻塞，直到某个文件描述符上发生了事件;
+              如果timeout设为0，则此时相当于非阻塞方式，函数select()查询完文件描述符集合的状态后立即返回。
+              如果timeout设成某一时间值，在这个时间内如果没有事件发生，函数select()将返回,如果有事件发生，程序将收到通知
+
+              注意:这里的文件描述符既可以是普通文件描述符也可以是套接字描述符
+
+    struct timeval结构定义:
+    struct timeval
+    {
+        long    tv_sec;    //秒数
+        long    tv_usec;   //微秒数
+    }
+    
+
+    返回值:
+    如果select()设定的要监视的文件描述符集合中有描述符发生了事件，则select将返回发生
+    事件的文件描述符的个数。
+
+    系统为文件描述符集合提供了一系列的宏以方便操作:
+
+    FD_CLR(int fd, fd_set *set);    //将文件描述符fd从文件描述符集合set中删除
+    FD_ISSET(int fd, fd_set *set);  //测试fd是否在set中
+    FD_SET(int fd, fd_set *set);    //在文件描述符集合set中增加文件描述符fd
+    FD_ZERO(fd_set *set);           //将文件描述符集合清空
+
+

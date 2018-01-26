@@ -1,0 +1,17 @@
+SRC=$(wildcard ./*.c)
+OBJ=$(patsubst %.c, %.o, $(SRC))
+BIN=./libstatic_test.a
+
+#生成静态库
+$(BIN):$(OBJ)
+	ar -cr $@ $^    
+#ar:创建静态库命令
+#-c : 创建
+#-r : replace 替换
+
+./%.o:./%.c
+	gcc -c $< -o $@
+
+#删除所有无关文件
+clean:
+	rm   $(OBJ) $(BIN)

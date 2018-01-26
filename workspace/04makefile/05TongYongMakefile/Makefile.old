@@ -1,0 +1,16 @@
+DIR=.
+BIN=./test
+SHARE=--share
+CFLAG=
+LFLAG=
+CC=gcc
+AR=ar cr
+CO=$(CC)
+SRC=$(wildcard $(DIR)/*.c)
+OBJ=$(patsubst %.c, %.o, $(SRC))
+CD=gcc -o 
+
+all:$(BIN)
+$(BIN):$(OBJ)
+	$(CO) $@ $^
+$(DIR)/%.o:$(DIR)/%.c

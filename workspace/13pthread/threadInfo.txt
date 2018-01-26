@@ -1,0 +1,98 @@
+/*************************************************************************
+	> File Name: threadInfo.txt
+	> Author: 
+	> Mail: 
+	> Created Time: 2018年01月22日 星期一 09时44分42秒
+ ************************************************************************/
+
+创建线程函数------------------------------------------------
+int pthread_create(pthread_t *thread, pthread_attr_t *attr,
+                  void *(start_routine)(void *), void *arg);
+
+    参数:  thread:   当线程创建成功时，用来返回线程的ID
+           attr  :   用于指定线程属性，NULL为默认属性
+           start_routine: 指定线程的入口函数
+           arg   :   线程入口函数的参数
+    返回值: 成功返回0
+            失败返回错误码
+
+获取本线程ID
+pthread_t pthread_self(void);
+
+
+终止指定线程
+int pthread_cancel(pthread_t tid);
+    返回值: 成功返回0
+            失败返回错误码
+
+主动退出本线程
+void pthread_exit(void *retval);
+    参数: retval: 线程退出返回值，可以通过join函数接收
+
+return + 字符串 也可以退出线程，通过join接收到该字符串
+
+查看线程信息命令
+ps aux -L
+
+
+等待指定线程结束(阻塞等待)
+int pthread_join(pthread_t thread, void **retval);
+    参数:   thread : 指定线程ID
+            retval : 接收线程返回值, 将线程结束时返回的字符串的地址赋给*retval,所以要传递二级指针
+                     不想去返回值的话，给NULL即可
+    返回值: 成功返回0
+            失败返回错误码
+
+判断两个线程ID是否指向同一线程
+int pthread_equal(pthread_t tid1, pthread_t tid2);
+    返回值: 相等返回一个非0值
+            否则返回0
+
+使指定的线程处于分离状态
+int pthread_detach(pthread_t tid);
+    返回值: 成功返回0
+            失败返回错误码
+
+线程分离状态:
+    当线程处于分离状态后，当它终止时，它的资源会自动返回给系统，不会出现资源占用问题，也不用
+使用pthread_join阻塞等待线程退出。 这样也就无法获取线程的返回值。
+
+
+初始化互斥量
+pthread_mutex_init(pthread_mutex_t *mutex, const pthreadattr_t *mutexattr);
+    第二个参数通常给NULL
+
+加锁操作(非阻塞版本), 当不能加锁时，直接返回
+pthread_mutex_trylock(pthread_mutex_t *mutex);
+
+加锁操作(阻塞版本), 当不能加锁时，阻塞等待直到能够加锁
+pthread_mutex_lock(pthread_mutex_t *mutex);
+
+解锁操作
+pthread_mutex_unlock(pthread_mutex_t *mutex);
+
+销毁互斥量
+pthread_mutex_destroy(pthread_mutex_t *mutex);
+
+
+ 
+条件变量
+pthread_cond_init(pthread_cond_t *cond, const pthreadattr_t *mutexattr);
+
+睡眠等待信号唤醒(1-解开mutex锁  2-睡眠  3-被唤醒后加mutex锁)
+pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex);
+
+发送唤醒信号(激活一个等待条件成立的线程，)
+pthread_cond_signal(pthread_cond_t *cond);
+
+广播信号
+pthread_cond_broadcast(pthread_cond_t *cond);
+
+
+一个没有sleep的死循环，会将不止一个cpu核心跑满，为了不让多个cpu跑满，
+我们可以把死循环那个线程绑定到某个cpu核心上，则它只会将这个核心跑满，
+而不会影响其他cpu核心
+一个由sleep的死循环，不会占用太多的cpu资源
+
+可以通过top命令查看cpu使用率， top内部按1显示所有cpu核心的使用率
+

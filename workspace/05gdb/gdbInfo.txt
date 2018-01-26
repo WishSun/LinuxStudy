@@ -1,0 +1,66 @@
+编译可调试程序: gcc -g test.c
+    -g : 该选项给可执行程序加上许多调试信息
+
+gdb命令:
+   run : 程序第一次执行,到第一个断点位置暂停。如果没有断点，则一直执行程序直至完成
+         run 后面可以加上参数，作为主函数main的参数
+         run 可简写为 r
+
+   start : 进入逐行调试模式, 不会一次性执行完整个程序
+
+   step : 一次执行一行语句, 遇到函数调用将进入函数
+         step 可简写为 s
+
+   next : 一次执行一行语句，但遇到函数调用不进入
+         next 可简写为 n
+
+   return 或 finish : 单步进入函数后，直接跳出函数
+
+   bt : 查看堆栈信息, 可以查看到段错误发生的行号
+
+   list : 查看当前行附近的所有代码(默认显示10行)
+          list 5, 10 : 显示当前文件 5 到 10 行的内容
+          list test.c : 5, 10   : 显示test.c文件的 5 到 10 行的内容
+          list main  : 显示main函数周围的代码
+          list test.c function : 显示test.c文件中函数function周围代码
+
+   break : 设置断点
+           break main : 可以给一个函数设置断点
+           break 12   : 可以为当前文件的某一行设置断点
+           break test.c 12 : 给源文件test.c 的第12行设置断点
+           可简写为 b
+
+   info breakPoint : 查看所有断点信息(断点位置，断点编号...)
+           可简写为 i b
+
+   delete : 删除断点
+            delete 4 : 删除断点号为4的断点
+            delete :  即不指定断点编号，则删除所有断点
+            可简写为 d 4
+
+   continue : 继续执行运行程序，到下一个断点暂停 或 watch 变量对象变量改变暂停
+              可简写为 c
+
+   print : 查看某个变量的内容
+           print a : 输出变量a的值
+           可简写为 p 
+
+   watch : 监控一个变量，当变量发生改变时，程序会停止
+           watch a : 监控变量a，如果a的值发生了改变，则程序暂停
+
+
+   后台进程调试:
+
+           将指定进程链接进入gdb调试:
+
+           gdb -p + PID : 可以进入正在运行的后台程序的调试模式
+           attach + PID : 在gdb内部命令环境进入一个后台进程的调试模式
+
+           解除当前链接进gdb的进程:
+           detach 
+
+   多线程调试: 
+          info thread : 查看所有线程信息(线程编号... 其中标识*指的是当前调试的线程)
+          thread + 线程编号 : 可以切换调试线程
+          set scheduler-locking on : 锁定调试线程，即只运行当前调试线程，其他线程不运行
+          set scheduler-locking off : 关闭锁定, 所有线程都会运行

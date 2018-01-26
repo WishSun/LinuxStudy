@@ -1,0 +1,13 @@
+test:
+	make -C ./dynamic
+	make -C ./static
+	make -C ./src
+install:
+	sudo rm -rf /usr/lib/libdynamic_test.so
+	#创建软连接必须指定绝对路径
+	sudo ln -s /home/sunxiwang/03AgainStudyLinux/workspace/04makefile/05TongYongMakefile/mkfile/dynamic/libdynamic_test.so /usr/lib/libdynamic_test.so
+	mv ./src/main ./bin
+clean:
+	make clean -C ./dynamic
+	make clean -C ./static
+	make clean -C ./src

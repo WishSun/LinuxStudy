@@ -1,0 +1,145 @@
+信号的生命周期:
+    信号产生->信号注册->信号在进程中注销->信号处理函数执行完毕
+
+可靠信号每一种信号都有一个信号队列
+不可靠信号所有信号共用一个信号队列
+
+
+kill -l : 查看所有信号
+kill -信号值 进程ID
+      例: kill -9 2679    //终止2679号进程
+
+ctrl + C : 发送SIGINT信号
+ctrl + \ : 发送SIGQUIT信号
+ctrl + Z : 发送SIGTSTP信号(使进程后台运行)
+
+whereis 函数名/命令 : 查看函数或命令在哪个手册中
+
+
+信号处理的方式:
+    (1)、采用系统默认处理方式(SIG_DFL)
+    (2)、捕捉信号处理，即用户自定义信号处理函数
+    (3)、忽略信号SIG_IGN， 但有两种信号不能忽略:SIGKILL SIGSTOP
+
+sigqueue函数------------------------------------------
+向指定进程发送指定信号，并携带一个参数
+int sigqueue(pid_t pid,     //进程ID
+             int sig,       //信号值
+             const union sigval value);  //携带参数
+
+            第三个参数类型(共用体)
+            union sigval
+            {
+                 int       sival_int;
+                 void     *sival_ptr;
+            };
+
+signal函数--------------------------------------------
+sighandler_t signal(int signum,     //信号值
+                    sighandler_t handler); //信号处理函数指针
+
+            第一个参数: signum
+                       通常为捕捉指定信号的信号值
+            第二个参数:handler
+                       自定义的处理信号函数
+                       参数类型:typedef void (*sighandler_t)(int); //参数为int，返回值为void的函数指针
+
+            当handler为:   SIG_IGN:  忽略该信号
+                           SIG_DFL:  使用默认方式处理该信号(一般是终止进程)
+
+sigaction函数----------------------------------------
+int sigaction(int signum,                   //信号值
+              const struct sigaction *act,  //新的信号处理函数
+              struct sigaction *oldact);    //旧的信号处理函数
+
+            第二、三参数结构类型:
+            struct sigaction
+            {
+               //两种信号处理函数类型
+               void     (*sa_handler)(int);
+               void     (*sa_sigaction)(int, siginfo_t *, void *);
+
+
+               sigset_t   sa_mask;              //信号集, 可以放多个信号(这些信号在处理该函数的第一个参数指定的信号时都被屏蔽，
+                                                直到该信号处理函数执行结束)
+                                                将第一个参数指定的信号会添加到该信号集中，在调用信号处理函数之前，该信号集会添
+                                                加到进程的信号屏蔽集中，当信号处理函数返回时，进程的信号屏蔽集会恢复到原来的值，
+                                                因此，当处理一个给定的信号时，如果这种信号再次发生，那么它会被阻塞到本次处理结
+                                                束为止。(前提是sa_flags未指定SA_NOMASK或SA_NODEFER)
+
+               int        sa_flags;             //标记  
+
+               void     (*sa_restorer)(void);   //弃用
+            };
+
+            sa_flags :  0                          正在执行的操作打断后，回来不继续执行刚才的未执行完的操作，而是跳过继续往下执行
+                        没有赋值为 SA_SIGINFO时    调用一个参数的函数sa_handler
+                        赋值为 SA_SIGINFO时        调用三个参数的函数sa_sigaction
+                        SA_NOMASK或SA_NODEFER      在处理此信号结束之前允许此信号再次递送，即一种信号还没处理完，又来一个同种信号
+                                                   还可以处理(不阻塞)
+
+
+
+                     当read或write函数返回值为EAGAIN 或 EAINT 时，
+                     它并不是函数执行出错，而是被信号打断了，应继续读取！
+
+            对sa_mask操作的函数:
+            int sigemptyset(sigset_t *set);             //将信号集清空
+
+            int sigfillset(sigset_t *set);              //将所有的信号(除了SIGKILL和SIGSTOP)添加到信号集中
+
+            int sigaddset(sigset_t *set, int signum);   //添加指定信号到指定信号集
+
+            int sigdelset(sigset_t *set, int signum);   //删除指定信号集中的指定信号
+
+            int sigismember(const sigset_t *set, int signum);  //判断指定信号是否在指定信号集中
+                                                                 返回值:  1  在集合中
+                                                                          0  不在集合中
+                                                                         -1  出错
+
+            三个参数的信号处理函数sa_sigaction的第二个参数类型:
+            siginfo_t
+            {
+                 int      si_signo;    /* Signal number */                          //信号编号
+                 int      si_errno;    /* An errno value */                         //错误码
+                 int      si_code;     /* Signal code */                            //信号产生原因
+                 int      si_trapno;   /* Trap number that caused
+                                          hardware-generated signal
+                                          (unused on most architectures) */
+                 pid_t    si_pid;      /* Sending process ID */                     //接收信号的进程ID
+                 uid_t    si_uid;      /* Real user ID of sending process */        //接收信号的进程的用户ID
+                 int      si_status;   /* Exit value or signal */                   //状态编号
+                 clock_t  si_utime;    /* User time consumed */                     //耗费的用户空间的时间
+                 clock_t  si_stime;    /* System time consumed */                   //耗费的系统内核的时间
+                 sigval_t si_value;    /* Signal value */                           //信号值
+                 int      si_int;      /* POSIX.1b signal */                        //用于传递数据
+                 void    *si_ptr;      /* POSIX.1b signal */                        //用于传递数据
+                 int      si_overrun;  /* Timer overrun count; POSIX.1b timers */   
+                 int      si_timerid;  /* Timer ID; POSIX.1b timers */             
+                 void    *si_addr;     /* Memory location which caused fault */   
+                 long     si_band;     /* Band event (was int in glibc 2.3.2 and earlier) */
+                 int      si_fd;       /* File descriptor */
+                 short    si_addr_lsb; /* Least significant bit of address*/
+            }
+
+
+信号的阻塞与未决
+     信号未决状态: 指的是信号的产生到信号处理之前是
+
+sigprocmask函数----------------------------------------------------------
+     int sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
+
+     当how取不同的值:
+          SIG_BLOCK :  将set中的所有信号添加到进程的信号屏蔽集中,并将原先进程的信号屏蔽集合中的信号保存到oldset中
+          SIG_UNBLOCK: 将set中的所有信号从进程的信号屏蔽集中删除
+          SIG_SETMASK: 将进程的信号屏蔽集合设置为set信号集
+
+
+//获取到未决链表中的所有信号,之后可以通过sigismember查看指定信号是否在未决信号集合中
+int sigpending(sigset_t *set);
+
+
+//定时器函数(经过seconds秒后向当前进程发送一个SIGALRM信号)
+unsigned int alarm(unsigned int seconds);
+
+

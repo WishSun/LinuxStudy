@@ -1,0 +1,158 @@
+创建匿名管道函数-----------------------------
+int pipe(int pipefd[2]);
+
+        参数说明:
+        是一个长度为2的int类型数组， 其中pipefd[0]提供读端文件描述符
+                                         pipefd[1]提供写端文件描述符
+
+        返回值:  创建成功返回0
+                 创建失败返回-1
+
+        使用:   管道创建完成后，管道的读端和写端描述符就处于打开状态，
+                可以通过read、write、close来读管道、写管道和关闭写或读功能
+                通常使用写入端时，关闭读取端
+                通常使用读取端时，关闭写入端
+
+        注意:   匿名管道只能用于具有亲属关系的进程间的通信，如父子进程和兄弟进程
+                fork()之后，子进程的管道描述符是从父进程复制过来的
+
+文件描述符重定向函数------------------------
+int dup2(int oldfd, int newfd);
+        功能: 将newfd重定向到oldfd指向的文件,然后关闭newfd, 即本来写到newfd中的内容就写到了oldfd中
+
+        返回值:  成功返回重定向后的文件描述符
+                 失败返回-1
+                 注意:
+                     如果oldfd不是一个有效的文件描述符，则调用失败，newfd不会被关闭。
+                     如果oldfd是一个有效的文件描述符，而且newfd和oldfd相同，则dup2什么都不做，并返回newfd
+
+
+shell命令创建管道文件
+    mkfifo + 管道文件名
+
+重定向   >  : 覆盖
+         >> : 追加
+命名管道可以使两个无关的进程相互通信
+
+创建命名管道函数---------------------------
+int mkfifo(const char *pathname, mode_t mode);
+        参数: pathname: 管道文件的绝对路径名或相对路径名
+              mode    : 管道文件的权限值
+        返回值: 成功返回0
+                失败返回-1
+        功能:  在指定路径下创建一个命名管道文件
+
+申请共享内存或打开共享内存
+int shmget(key_t key, size_t size, int shmflg);
+      key : 是这块共享内存的唯一标识，可以随便给但要唯一
+      size: 共享内存的大小
+      shmflg : 
+                IPC_CREAT : 如果共享内存不存在则创建
+                IPC_CREAT | IPC_EXCL  : 如果共享内存存在则出错, 错误代码为EEXIST
+
+
+查看命令:
+ipcs -m   查看共享内存
+     -s   查看信号量
+     -q   查看消息队列
+
+
+
+删除命令
+ipcrm -m + 共享内存ID
+      -s + 信号量ID
+      -q + 消息队列ID
+
+
+将共享内存映射到进程空间，返回共享内存的访问地址
+void *shmat(int shmid, const void *shmaddr, int shmflg);
+        参数: shmid   : 共享内存标识ID
+              shmaddr : 指定映射到进程空间的首地址，通常为NULL，让系统自己找一块合适的地址映射，然后将该地址返回
+              shmflg  : 
+                        0 : 对这块共享内存具有可读可写权限
+                        SHM_RDONLY: 具有只读权限
+
+通过映射首地址，解除这块共享内存与进程空间的映射关系(并非删除共享内存)
+int shmdt(const void *shmaddr);
+
+
+通过参数控制共享内存(可以用来删除共享内存)
+int shmctl(int shmid, int cmd, struct shmid_ds *buf);
+        参数: shmid : 共享内存ID
+              cmd   : IPC_RMID, 将共享内存的引用连接数-1，并从现在开始拒绝其他进程的连接映射,直到引用连接数为0时,
+                                系统才会删除这块共享内存
+              buf   : 一般为NULL
+
+
+创建/打开信号量
+int semget(key_t key, int nsems, int semflg);
+
+        功能: 创建信号量，若信号量存在，则打开信号量
+        参数: key : 信号量的唯一键值
+              nsems: 信号量的个数
+              semflg: IPC_CREAT | 0777  
+        返回值: 返回一个信号量标识符ID，可以用它来操作该信号量
+
+控制信号量
+int semctl(int semid, int semnum, int cmd, ...);
+
+      参数: semid:  信号量ID
+            semnum: 当操作单个信号量值的时候，表示操作的是第n个信号量，从0开始计数
+            cmd : 表示要执行的操作
+                    IPC_RMID : 删除信号量
+                    SETALL   : 使用数组对所有信号量设置初值, semnum参数是被忽略的
+                    SETVAL   : 对单个信号进行设置初值,设置第semnum个信号量 
+                    GETALL   :
+                    GETVAL   : 获取第semnum个信号量的值，第四个参数传0
+
+            必须在程序中自己定义该共用体
+            union semun
+            {
+               int              val;    /* Value for SETVAL */
+               struct semid_ds *buf;    /* Buffer for IPC_STAT, IPC_SET */
+               unsigned short  *array;  /* array for getall, setall */
+               struct seminfo  *__buf;  /* buffer for ipc_info
+                                          (linux-specific) */
+            };
+
+
+执行PV操作
+int semop(int semid, struct sembuf *sops, unsigned nsops);
+
+第二个参数结构
+struct sembuf
+{
+    unsigned short sem_num;        //第几个信号量
+    short          sem_op;        //-1操作为P操作，+1操作为V操作
+    short          sem_flg;        //   0       : 当无法获取信号量时，进程将会阻塞
+                                     IPC_NOWAIT : 当无法获取信号量时，直接返回不阻塞
+                                     IPC_UNDO   : 当进程执行P操作后，崩溃了，而没有执行V操作，将会陷入死锁。
+                                                  而设置了IPC_UNDO，则会在进程崩溃后撤销该进程的P操作，防止死锁的发生
+}
+
+
+末行命令:
+    :22, 26s/src/dest/g
+    //将22行到26行的src全部替换成dest，而且不询问
+
+    :22, 26s/src/dest/gc
+    //将22行到26行的src全部替换成dest，需要询问
+
+
+
+getopt函数------------------------------
+#include <unistd.h>
+int getopt(int argc, char *const argv[], const char *optstring);
+     参数: argc: 参数的个数
+           argv: 参数字符串数组
+           optstring: 选项格式
+                      例如; optstring = "a:bcd";
+                            该格式支持4种选项: -a -b -c -d
+                            其中-a选项后面可以跟相关参数(因为在选项格式中a后面有':'(冒号))，如 -a hello
+                            而其他选项后面不可以跟相关参数, 就算跟了也不会识别。
+     返回值: 返回当前选项参数的值，直到最后一个参数分析完返回-1, 遇到未定义的参数返回'?'
+
+     全域变量optind : 下一个将被处理到的参数在argv中的下标值
+             char *optarg: 选项参数后面跟的相关参数的地址
+             optopt : 如果当前解析的选项参数未定义，函数将返回'?', optopt将存储该选项参数的值
+                            

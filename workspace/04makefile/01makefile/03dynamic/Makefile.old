@@ -1,0 +1,14 @@
+SRC=$(wildcard ./*.c)
+OBJ=$(patsubst %.c, %.o, $(SRC))
+BIN=./libdynamic_test.so
+
+$(BIN):$(OBJ)
+	gcc --share -o $@ $^
+#生成动态链接库
+#-share : 这个链接选项标识是生成动态链接库，
+
+./%.o:./%.c
+	gcc -c $< -o $@ -fPIC
+
+clean:
+	rm $(OBJ) $(BIN)

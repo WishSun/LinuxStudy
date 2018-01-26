@@ -1,0 +1,20 @@
+DIR=./src
+BIN=./test
+SHARE=--share#链接生成动态库时候的连接选项
+CFLAG= -Wall -g -fPIC -I./inc#-I指定从哪个目录找头文件
+LFLAG=-L./lib -ld_test -ls_test# $(SHARE)
+CC=gcc -o#用于编译或者链接动态库以及可执行程序
+AR=ar cr#专门用于链接生成静态库的
+CO=$(CC)
+SRC=$(wildcard $(DIR)/*.c)
+OBJ=$(patsubst %.c, %.o, $(SRC))
+
+all:$(BIN)
+$(BIN):$(OBJ)
+	$(CO) $@ $^ $(LFLAG)
+$(DIR)/%.o:$(DIR)/%.c
+	$(CC) $@ -c $< $(CFLAG)
+
+.PHONY:clean
+clean:
+	rm $(OBJ) $(BIN)

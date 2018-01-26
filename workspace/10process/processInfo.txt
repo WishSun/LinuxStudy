@@ -1,0 +1,25 @@
+写时复制:
+
+fork函数----------------------------
+pid_t fork(void);
+      返回值:  -1    出错
+               0     子进程
+               >0    父进程，值为子进程ID
+
+复制进程空间包括缓冲区
+
+
+pid_t getpid();   //获取调用进程的进程ID
+pid_t getppid();  //获取调用进程的父进程ID
+pid_t getpgid(pid_t pid); //获取指定进程ID的组ID
+pid_t getsid(pid_t pid);  //获取指定进程ID的会话ID
+
+umask(int);    //更改创建文件的权限掩码值
+
+实际创建出来的文件的权限 = 给定参数权限 & ~权限掩码值
+
+int daemon(int nochdir, int noclose);
+
+
+命令fuser
+        -a + 文件名(可以是多个,用空格分隔) : 查看文件是否被占用, 和被谁占用

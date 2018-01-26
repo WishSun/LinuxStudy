@@ -1,0 +1,36 @@
+#下面wildcard命令是将所有当前目录下.c文件名赋值给SRC
+SRC=$(wildcard ./*.c)
+
+#将SRC中的所有.c文件名改为.o，然后赋值给OBJ,然后OBJ就存放了当前目录下所有的.o文件名
+OBJ=$(patsubst %.c,  %.o, $(SRC))
+
+#可执行文件名变量BIN
+BIN=./main
+
+#将当前目录下的所有.o文件链接为可执行文件BIN
+$(BIN):$(OBJ)
+	gcc -o $@  $^ -L../05lib -lstatic_test -ldynamic_test
+	#-o选项是: 将所有.o文件链接成可执行文件
+	#-L选项是: 告诉gcc库的路径
+
+#%.c在当前目录下所有的.c文件
+#将当前目录下的所有.c源文件逐一拿出来编译为.o目标文件, 每次只编译一个
+./%.o:./%.c
+	gcc -c $< -o $@  #-c选项是: 只编译不连接
+
+
+#clean是一个生成的对象，但他没有依赖文件
+clean:    
+	rm -rf  $(OBJ) $(BIN)
+
+# 先生成$(BIN)，再执行clean后面的命令。  即顺序执行rebuild之后的每个对象
+rebuild:  clean $(BIN) 
+
+# 将生成的可执行文件安装到/bin中，即可以不指定路径即可执行该文件
+install:
+	mv $(BIN) /bin
+
+
+
+
+

@@ -1,0 +1,49 @@
+目录操作:
+
+打开目录-----------------------
+
+DIR *opendir(const char *name);
+
+创建目录----------------------
+int mkdir(const char *pathname, mode_t mode);
+
+读取目录----------------------
+struct dirent *readdir(DIR *dirp);
+
+struct dirent {
+               ino_t          d_ino;       /* inode number */
+               off_t          d_off;       /* not an offset; see NOTES */
+               unsigned short d_reclen;    /* length of this record */
+               unsigned char  d_type;      /* type of file; not supported by all filesystem types */
+               char           d_name[256]; /* filename */
+                                                                                                                                    };
+
+关闭目录---------------------
+int closedir(DIR *dirp);
+
+时间函数--------------------
+<time.h>
+
+//将struct tm结构转为格式化时间
+size_t strftime(char *s, size_t max, const char *format,
+                       const struct tm *tm);
+
+//将秒数time_t转化为struct tm结构
+struct tm *localtime_r(const time_t *timep, struct tm *result);
+
+struct tm结构: 
+struct tm {
+               int tm_sec;         /* seconds */
+               int tm_min;         /* minutes */
+               int tm_hour;        /* hours */
+               int tm_mday;        /* day of the month */
+               int tm_mon;         /* month */
+               int tm_year;        /* year */
+               int tm_wday;        /* day of the week */
+               int tm_yday;        /* day in the year */
+               int tm_isdst;       /* daylight saving time */
+          };
+
+
+作业-------------------------
+完成一个函数，实现多层级目录下的监控(tree), 递归实现

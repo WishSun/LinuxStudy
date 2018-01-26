@@ -1,0 +1,111 @@
+select:
+    int select(int nfds, fd_set *readfds, fd_set *writefds,
+    fd_set *exceptfds, struct timeval *timeout);
+    参数: 
+           nfds:        当前所有几何中最大的描述符值
+           readfds:     探测可读描述符集合
+           writefds:    探测可写描述符集合
+           exceptfds:   探测异常描述符集合
+           timeout:     等待超时时间， 
+                        如果timeout中的秒数和微秒数都为0时，非阻塞
+                        如果timeout为NULL，永久阻塞
+
+    void FD_CLR(int fd, fd_set *set);    //将指定描述符在指定描述符集合中删除
+    int  FD_ISSET(int fd, fd_set *set);  //判断指定描述符集合中是否有指定描述符就绪
+    void FD_SET(int fd, fd_set *set);    //将指定描述符添加到指定描述符集合中
+    void FD_ZERO(fd_set *set);           //清空指定描述符集合
+
+    select的优缺点:
+        优点: 可移植性强
+        缺点: 1.监听描述符有上限个数为1024，最高并发量只有1024, 但可以修改配置文件，但需要重新编译内核
+              2.需要定义数组保存所有描述符的值，以便每次在新连接到来或有旧连接关闭时可以重新确定最大描述符值
+              3.每次处理完毕后，需要清空并重新向集合中添加描述符
+                因为select每次返回时，都会修改已就绪描述符的状态值(是直接在描述符集合中描述符本身上做的修改), 
+                所以再次执行select时，一些描述符的状态值已经不是初始状态了，所以需要将集合清空，再所有描述符重新添加进去
+              4.当有就绪描述符时，select并不会告诉我们哪一个描述符已经就绪，只是在原有集合上修改状态，因此当我们
+                处理的时候，须有循环遍历集合中的所有描述符才能判断哪一个是就绪描述符！当监听数目较大时，效率较低
+
+    1.创建socket
+    2.定义监听地址信息，并未socket绑定监听地址
+    3.开始监听(告诉系统开始监听地址是否有数据到来)
+    4.将socket描述符添加到select的监听集合中
+        (监听集合用于select监听判断集合中的描述符是否就绪)
+    5.select开始监听
+    6.select返回值
+        <0  select出错
+        =0  等待超时(指定时间内没有就绪的描述符)
+        >0 已经有描述符就绪
+    7.当描述符就绪，判断描述符是否=监听socket描述符(代表有新连接请求)
+    8. = 监听socket描述符(accept处理新的连接请求), 重新确定当前最大描述符值
+      != 监听socket描述符(代表有传输数据到来)
+        接收出错，将描述符从select监听集合删除并关闭，重新确定当前最大描述符值
+    9.关闭
+
+epoll
+    1.创建socket
+    2.定义监听地址信息，并未socket绑定监听地址
+    3.开始监听(告诉系统开始监听地址是否有数据到来)
+    4.创建epoll监听集合
+    5.定义事件结构，并将事件与描述符关联
+    6.将描述符与事件添加到epoll监听集合
+    7.开始epoll监听(返回值判断)
+       <0  epoll_wait错误
+       =0  epoll_wait超时
+       >0  就绪的事件个数，将已就绪的事件放到一个指定的事件数组中
+    8.根据就绪的事件个数，循环遍历就绪事件数组
+       判断事件fd是否=监听套接字描述符
+         ==  处理新连接, 将新连接socket描述符添加到epoll监听集合
+         !=  其他的数据传输事件
+       传输若出错，则将描述符从epoll监听集合中删除，并关闭
+    9.关闭
+
+创建一个epoll监听列表
+int epoll_create(int size);
+  参数  : size : 监听的描述符上限个数
+  返回值:
+        成功返回操作epoll监听列表的描述符
+        失败返回-1
+
+控制epoll监听列表
+int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
+    功能: 对描述符对应的事件进行操作
+    参数:
+        epfd :  对epoll监听列表操作的描述符
+        op   :  操作命令
+             EPOLL_CTL_ADD:  添加新的描述符和其绑定的事件到监听列表中
+             EPOLL_CTL_DEL:  将指定的描述符从epoll监听列表中删除，存放到event中
+             EPOLL_CTL_MOD:  对指定描述符的事件进行修改  
+        fd   :  要添加到监听列表中的描述符
+        event:  描述符对应的事件
+            EPOLLIN     可读事件
+            EPOLLOUT    可写事件
+            EPOLLET     边缘触发(默认为水平触发)
+
+    返回值: 成功返回0，失败返回-1 
+
+typedef union epoll_data_t
+{
+    void        *ptr;    
+    int          fd;     
+    uint32_t     u32;
+    uint64_t     u64;
+} epoll_data_t;
+
+struct epoll_event
+{
+    uint32_t     events;      /* Epoll events */
+    epoll_data_t data;        /* User data variable */
+};
+
+int epoll_wait(int epfd, struct epoll_event *events,int maxevents, int timeout);
+功能: 检测epoll监听集合中是否有就绪的描述符，如果有就绪的描述符，就将其对应的事件放入events数组中
+    参数:
+          epfd :  对epoll监听列表操作的描述符
+          events: 存储已就绪的事件
+          maxevents:  epoll监听列表的最大长度
+          timout:     超时时间(单位: 毫秒) 1000毫秒 = 1秒
+    返回值: 
+          <0   : 出错
+          =0   : 超时
+          >0   : 有返回值那么多个描述符就绪了
+
